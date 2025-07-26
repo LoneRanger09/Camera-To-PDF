@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Camera to PDF Web App</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script src="https://unpkg.com/browser-image-compression/dist/browser-image-compression.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h2>Camera PDF Generator</h2>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <img id="preview" alt="Captured Image Preview" />
+    <div class="inputs">
+      <input type="number" id="minSize" placeholder="Min KB" min="1" />
+      <input type="number" id="maxSize" placeholder="Max KB" min="1" />
+      <input type="text" id="fileName" placeholder="PDF File Name" />
+    </div>
+    <button id="switchBtn">Switch Camera</button>
+    <button id="captureBtn">Capture</button>
+    <button id="downloadBtn" disabled>Download PDF</button>
+    <div id="status"></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

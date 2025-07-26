@@ -1,0 +1,84 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #f7f7f7;
+}
+.container {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 16px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  margin-top: 24px;
+}
+h2 {
+  text-align: center;
+  font-size: 1.3rem;
+  margin-bottom: 12px;
+}
+.inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.inputs input {
+  padding: 10px;
+  font-size: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  outline: none;
+}
+video, #preview {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  background: #222;
+  object-fit: cover;
+}
+button {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 8px;
+  background: #0078d4;
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+button:disabled {
+  background: #aaa;
+  cursor: not-allowed;
+}
+#status {
+  text-align: center;
+  font-size: 1rem;
+  color: #0078d4;
+  margin-top: 8px;
+  min-height: 24px;
+}
+@media (max-width: 500px) {
+  .container {
+    max-width: 98vw;
+    margin: 0 1vw;
+    padding: 8px;
+    margin-top: 8px;
+  }
+  h2 {
+    font-size: 1rem;
+  }
+  button {
+    font-size: 1rem;
+    padding: 10px;
+  }
+  .inputs input {
+    font-size: 0.95rem;
+    padding: 8px;
+  }
+}

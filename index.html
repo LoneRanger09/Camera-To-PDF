@@ -15,6 +15,37 @@
     <h2>Camera PDF Generator</h2>
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
+    
+    <!-- Cropping Container -->
+    <div id="cropContainer" class="crop-container" style="display:none;">
+      <div class="crop-header">
+        <h3>Crop Your Image</h3>
+        <p>Drag to select the area you want to keep</p>
+        <p class="crop-shortcuts">Shortcuts: Enter=Crop, S=Skip, R=Reset, Esc=Cancel</p>
+      </div>
+      <div class="crop-wrapper">
+        <img id="cropImage" alt="Image to crop" />
+        <div id="cropOverlay" class="crop-overlay">
+          <div id="cropSelection" class="crop-selection">
+            <div class="crop-handle nw"></div>
+            <div class="crop-handle ne"></div>
+            <div class="crop-handle sw"></div>
+            <div class="crop-handle se"></div>
+            <div class="crop-handle n"></div>
+            <div class="crop-handle s"></div>
+            <div class="crop-handle e"></div>
+            <div class="crop-handle w"></div>
+          </div>
+        </div>
+      </div>
+      <div class="crop-buttons">
+        <button id="cropConfirm" class="crop-btn confirm">Crop & Continue</button>
+        <button id="cropSkip" class="crop-btn skip">Skip Crop</button>
+        <button id="cropCancel" class="crop-btn cancel">Cancel</button>
+        <button id="cropReset" class="crop-btn reset">Reset Selection</button>
+      </div>
+    </div>
+    
     <img id="preview" alt="Captured Image Preview" style="display:none;" />
     <div class="inputs">
       <input type="number" id="minSize" placeholder="Min KB (default: 50)" min="1" value="50" />

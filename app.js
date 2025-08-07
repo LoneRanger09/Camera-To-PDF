@@ -14,34 +14,271 @@ let pdfBlob = null;
 let currentFacingMode = 'environment';
 let currentStream = null;
 
+// Initialize the app
+function initializeApp() {
+  // Set initial status
+  statusDiv.textContent = 'Initializing camera...';
+  
+  // Hide preview initially
+  preview.style.display = 'none';
+  
+  // Disable download button initially
+  downloadBtn.disabled = true;
+  
+  // Add input validation
+  minSizeInput.addEventListener('input', validateSizeInputs);
+  maxSizeInput.addEventListener('input', validateSizeInputs);
+  
+  // Run debug check in console (for development)
+  debugCameraAccess();
+  
+  // Check available cameras and start camera
+  checkAvailableCameras().then(() => {
+    startCamera(currentFacingMode);
+  });
+}
+
+// Validate size inputs
+function validateSizeInputs() {
+  const minVal = parseInt(minSizeInput.value);
+  const maxVal = parseInt(maxSizeInput.value);
+  
+  if (minVal && maxVal && minVal >= maxVal) {
+    statusDiv.textContent = 'Warning: Minimum size should be less than maximum size.';
+    statusDiv.style.color = '#ff6b6b';
+  } else if (statusDiv.textContent.includes('Warning:')) {
+    statusDiv.textContent = '';
+    statusDiv.style.color = '#0078d4';
+  }
+}
+
+// Check available cameras
+async function checkAvailableCameras() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+    
+    console.log('Available cameras:', videoDevices);
+    
+    // Add debug info to help troubleshoot
+    videoDevices.forEach((device, index) => {
+      console.log(`Camera ${index + 1}:`, {
+        label: device.label,
+        deviceId: device.deviceId,
+        groupId: device.groupId
+      });
+    });
+    
+    if (videoDevices.length < 2) {
+      // Hide switch button if only one camera
+      switchBtn.style.display = videoDevices.length === 0 ? 'none' : 'block';
+      switchBtn.textContent = videoDevices.length === 0 ? 'No Camera' : 'Camera';
+      if (videoDevices.length === 1) {
+        switchBtn.disabled = true;
+        switchBtn.textContent = 'Single Camera';
+      }
+    } else {
+      switchBtn.style.display = 'block';
+      switchBtn.disabled = false;
+      switchBtn.textContent = currentFacingMode === 'environment' ? 'Switch to Front' : 'Switch to Back';
+    }
+    
+    return videoDevices;
+  } catch (error) {
+    console.error('Error checking cameras:', error);
+    return [];
+  }
+}
+
+// Debug function to test camera access
+async function debugCameraAccess() {
+  console.log('=== Camera Debug Info ===');
+  
+  try {
+    // Check if getUserMedia is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error('getUserMedia not supported');
+      return;
+    }
+    
+    // Test basic camera access
+    console.log('Testing basic camera access...');
+    const basicStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    console.log('✓ Basic camera access works');
+    basicStream.getTracks().forEach(track => track.stop());
+    
+    // Test environment camera
+    console.log('Testing environment (back) camera...');
+    try {
+      const envStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      console.log('✓ Environment camera works');
+      envStream.getTracks().forEach(track => track.stop());
+    } catch (envError) {
+      console.log('✗ Environment camera failed:', envError);
+    }
+    
+    // Test user camera
+    console.log('Testing user (front) camera...');
+    try {
+      const userStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user' } 
+      });
+      console.log('✓ User camera works');
+      userStream.getTracks().forEach(track => track.stop());
+    } catch (userError) {
+      console.log('✗ User camera failed:', userError);
+    }
+    
+    // List all devices
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    console.log('All available devices:', devices);
+    
+  } catch (error) {
+    console.error('Debug camera access failed:', error);
+  }
+  
+  console.log('=== End Camera Debug ===');
+}
+
 // Open camera with facingMode
 async function startCamera(facingMode = 'environment') {
   if (currentStream) {
     currentStream.getTracks().forEach(track => track.stop());
   }
+  
+  // Try multiple constraint configurations for better device compatibility
+  const constraints = [
+    // First try: exact facingMode
+    { video: { facingMode: { exact: facingMode } } },
+    // Second try: ideal facingMode
+    { video: { facingMode: { ideal: facingMode } } },
+    // Third try: just facingMode string
+    { video: { facingMode: facingMode } },
+    // Fourth try: deviceId based approach (we'll enumerate devices)
+    null, // Will be set dynamically
+    // Last resort: any video
+    { video: true }
+  ];
+  
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
+    // Try to get specific camera using constraints
+    for (let i = 0; i < constraints.length - 1; i++) {
+      try {
+        if (constraints[i] === null) {
+          // Try device enumeration approach
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          
+          if (videoDevices.length > 0) {
+            // Find the appropriate camera
+            let targetDevice = videoDevices.find(device => 
+              facingMode === 'environment' ? 
+                device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('rear') :
+                device.label.toLowerCase().includes('front') || device.label.toLowerCase().includes('user')
+            );
+            
+            // If no specific camera found, use first available for environment, last for user
+            if (!targetDevice) {
+              targetDevice = facingMode === 'environment' ? 
+                videoDevices[videoDevices.length - 1] : videoDevices[0];
+            }
+            
+            if (targetDevice && targetDevice.deviceId) {
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: targetDevice.deviceId } }
+              });
+              video.srcObject = stream;
+              currentStream = stream;
+              statusDiv.textContent = `Camera ready (${facingMode})`;
+              return;
+            }
+          }
+          continue;
+        }
+        
+        const stream = await navigator.mediaDevices.getUserMedia(constraints[i]);
+        video.srcObject = stream;
+        currentStream = stream;
+        statusDiv.textContent = `Camera ready (${facingMode})`;
+        return;
+        
+      } catch (constraintError) {
+        console.log(`Constraint ${i} failed:`, constraintError);
+        continue;
+      }
+    }
+    
+    // Last resort - any camera
+    const stream = await navigator.mediaDevices.getUserMedia(constraints[constraints.length - 1]);
     video.srcObject = stream;
     currentStream = stream;
+    statusDiv.textContent = 'Camera ready (default)';
+    
   } catch (err) {
-    statusDiv.textContent = 'Camera access denied.';
+    console.error('Camera error:', err);
+    statusDiv.textContent = `Camera access denied or ${facingMode} camera not available.`;
+    
+    // Try to provide helpful error message
+    if (err.name === 'NotFoundError' || err.name === 'DeviceNotFoundError') {
+      statusDiv.textContent = `${facingMode === 'environment' ? 'Back' : 'Front'} camera not found. Try switching cameras.`;
+    } else if (err.name === 'NotAllowedError') {
+      statusDiv.textContent = 'Camera access denied. Please allow camera permissions.';
+    } else if (err.name === 'NotReadableError') {
+      statusDiv.textContent = 'Camera is being used by another application.';
+    }
   }
 }
-startCamera(currentFacingMode);
+
+// Initialize the app
+initializeApp();
 
 // Switch camera
-switchBtn.onclick = () => {
-  currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
-  startCamera(currentFacingMode);
+switchBtn.onclick = async () => {
+  if (switchBtn.disabled) return;
+  
+  statusDiv.textContent = 'Switching camera...';
+  const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+  
+  try {
+    await startCamera(newFacingMode);
+    currentFacingMode = newFacingMode;
+    
+    // Update button text
+    switchBtn.textContent = currentFacingMode === 'environment' ? 'Switch to Front' : 'Switch to Back';
+    
+  } catch (error) {
+    console.error('Error switching camera:', error);
+    statusDiv.textContent = `Failed to switch to ${newFacingMode === 'environment' ? 'back' : 'front'} camera`;
+    
+    // Try to go back to the original camera
+    setTimeout(() => {
+      startCamera(currentFacingMode);
+    }, 2000);
+  }
 };
 
 // Capture image
 captureBtn.onclick = async () => {
   statusDiv.textContent = '';
+  
+  if (!video.videoWidth || !video.videoHeight) {
+    statusDiv.textContent = 'Error: Camera not ready. Please wait for camera to load.';
+    return;
+  }
+  
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  const context = canvas.getContext('2d');
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
   canvas.toBlob(async (blob) => {
+    if (!blob) {
+      statusDiv.textContent = 'Error: Failed to capture image.';
+      return;
+    }
+    
     preview.src = URL.createObjectURL(blob);
     preview.style.display = 'block';
     capturedImageBlob = blob;
@@ -53,75 +290,134 @@ captureBtn.onclick = async () => {
 async function processImageToPDF(imageBlob) {
   const minKB = parseInt(minSizeInput.value) || 50;
   const maxKB = parseInt(maxSizeInput.value) || 300;
+  
+  // Check if required libraries are loaded
+  if (!window.imageCompression || !PDFLib) {
+    statusDiv.textContent = 'Error: Required libraries not loaded. Please refresh the page.';
+    return;
+  }
   let quality = 0.95;
   let width = video.videoWidth;
   let height = video.videoHeight;
   let attempts = 0;
   let pdfSizeKB = 0;
   let compressedBlob = imageBlob;
+  
   statusDiv.textContent = 'Processing...';
-  while (attempts < 15) {
-    // Compress image
-    compressedBlob = await window.imageCompression(imageBlob, {
-      maxWidthOrHeight: Math.round(width),
-      initialQuality: quality,
-      useWebWorker: true
-    });
-    // Convert to PDF
-    const pdfDoc = await PDFLib.PDFDocument.create();
-    const imgBytes = await compressedBlob.arrayBuffer();
-    const img = await pdfDoc.embedJpg(imgBytes);
-    const page = pdfDoc.addPage([img.width, img.height]);
-    page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-    const pdfBytes = await pdfDoc.save();
-    pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-    pdfSizeKB = Math.round(pdfBlob.size / 1024);
-
-    // Strictly enforce range
-    if (pdfSizeKB >= minKB && pdfSizeKB <= maxKB) {
-      statusDiv.textContent = `PDF ready (${pdfSizeKB} KB)`;
-      downloadBtn.disabled = false;
-      return;
-    }
-
-    // If out of range, keep compressing
-    if (pdfSizeKB > maxKB) {
-      quality -= 0.15;
-      width *= 0.85;
-      height *= 0.85;
-    } else if (pdfSizeKB < minKB) {
-      quality += 0.05;
-      width *= 1.05;
-      height *= 1.05;
-    }
-    // Ensure quality does not go below 0.1
-    if (quality < 0.1) quality = 0.1;
-    attempts++;
+  
+  // Validate input ranges
+  if (minKB >= maxKB) {
+    statusDiv.textContent = 'Error: Minimum size must be less than maximum size.';
+    return;
   }
-  // Only enable download if strictly in range
-  statusDiv.textContent = `Could not fit PDF strictly in range (${minKB} KB - ${maxKB} KB). Final size: ${pdfSizeKB} KB.`;
-  downloadBtn.disabled = true;
+  
+  try {
+    while (attempts < 15) {
+      // Compress image
+      compressedBlob = await window.imageCompression(imageBlob, {
+        maxWidthOrHeight: Math.round(width),
+        initialQuality: quality,
+        useWebWorker: true
+      });
+      
+      // Convert to PDF
+      const pdfDoc = await PDFLib.PDFDocument.create();
+      const imgBytes = await compressedBlob.arrayBuffer();
+      
+      let img;
+      try {
+        img = await pdfDoc.embedJpg(imgBytes);
+      } catch (jpgError) {
+        // Try PNG if JPG fails
+        try {
+          img = await pdfDoc.embedPng(imgBytes);
+        } catch (pngError) {
+          statusDiv.textContent = 'Error: Unsupported image format.';
+          return;
+        }
+      }
+      
+      const page = pdfDoc.addPage([img.width, img.height]);
+      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+      const pdfBytes = await pdfDoc.save();
+      pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+      pdfSizeKB = Math.round(pdfBlob.size / 1024);
+
+      // Strictly enforce range
+      if (pdfSizeKB >= minKB && pdfSizeKB <= maxKB) {
+        statusDiv.textContent = `PDF ready (${pdfSizeKB} KB)`;
+        downloadBtn.disabled = false;
+        return;
+      }
+
+      // If out of range, keep compressing
+      if (pdfSizeKB > maxKB) {
+        quality -= 0.1;
+        width *= 0.9;
+        height *= 0.9;
+      } else if (pdfSizeKB < minKB) {
+        quality = Math.min(quality + 0.05, 1.0);
+        width *= 1.05;
+        height *= 1.05;
+      }
+      
+      // Ensure quality does not go below 0.1
+      if (quality < 0.1) quality = 0.1;
+      attempts++;
+      
+      statusDiv.textContent = `Processing... (${attempts}/15) Current size: ${pdfSizeKB} KB`;
+    }
+    
+    // Only enable download if strictly in range
+    statusDiv.textContent = `Could not fit PDF strictly in range (${minKB} KB - ${maxKB} KB). Final size: ${pdfSizeKB} KB.`;
+    downloadBtn.disabled = true;
+    
+  } catch (error) {
+    console.error('PDF processing error:', error);
+    statusDiv.textContent = 'Error processing image. Please try again.';
+    downloadBtn.disabled = true;
+  }
 }
 
 // Download PDF
 downloadBtn.onclick = () => {
-  if (pdfBlob) {
+  if (!pdfBlob) {
+    statusDiv.textContent = 'Error: No PDF available for download.';
+    return;
+  }
+  
+  try {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(pdfBlob);
     // Use user input for file name, fallback to default
     const name = fileNameInput.value.trim() || 'camera-image';
-    a.download = `${name}.pdf`;
+    // Sanitize filename - remove invalid characters
+    const sanitizedName = name.replace(/[<>:"/\\|?*]/g, '');
+    a.download = `${sanitizedName}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    
+    // Clean up the blob URL
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    
+    statusDiv.textContent = 'PDF downloaded successfully!';
+  } catch (error) {
+    console.error('Download error:', error);
+    statusDiv.textContent = 'Error downloading PDF. Please try again.';
   }
 }
 
 
+// Service Worker Registration
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('/sw.js')
-      .then(() => console.log('Service Worker Registered'))
-      .catch((err) => console.error('SW registration failed:', err));
+    navigator.serviceWorker.register('./sw.js')
+      .then((registration) => {
+        console.log('Service Worker Registered successfully:', registration.scope);
+      })
+      .catch((err) => {
+        console.error('SW registration failed:', err);
+      });
   });
 }

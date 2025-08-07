@@ -15,11 +15,11 @@
     <h2>Camera PDF Generator</h2>
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
-    <img id="preview" alt="Captured Image Preview" />
+    <img id="preview" alt="Captured Image Preview" style="display:none;" />
     <div class="inputs">
-      <input type="number" id="minSize" placeholder="Min KB" min="1" />
-      <input type="number" id="maxSize" placeholder="Max KB" min="1" />
-      <input type="text" id="fileName" placeholder="PDF File Name" />
+      <input type="number" id="minSize" placeholder="Min KB (default: 50)" min="1" value="50" />
+      <input type="number" id="maxSize" placeholder="Max KB (default: 300)" min="1" value="300" />
+      <input type="text" id="fileName" placeholder="PDF File Name (optional)" />
     </div>
     <button id="switchBtn">Switch Camera</button>
     <button id="captureBtn">Capture</button>

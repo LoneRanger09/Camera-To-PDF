@@ -55,6 +55,14 @@ button {
 button:disabled {
   background: #aaa;
   cursor: not-allowed;
+  opacity: 0.6;
+}
+button:hover:not(:disabled) {
+  background: #106ebe;
+}
+#switchBtn:disabled {
+  background: #ddd;
+  color: #666;
 }
 #status {
   text-align: center;
@@ -62,6 +70,13 @@ button:disabled {
   color: #0078d4;
   margin-top: 8px;
   min-height: 24px;
+  transition: color 0.3s ease;
+}
+#status.error {
+  color: #ff6b6b;
+}
+#status.success {
+  color: #28a745;
 }
 @media (max-width: 500px) {
   .container {

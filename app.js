@@ -38,6 +38,10 @@ let cropData = {
   height: 200
 };
 
+// Cropper.js instance (mobile alternative)
+let mobileCropper = null;
+const USE_MOBILE_CROPPER = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && window.Cropper;
+
 // Initialize the app
 function initializeApp() {
   // Always set default to back camera on load
@@ -173,6 +177,10 @@ async function debugCameraAccess() {
 
 // Cropping System Functions
 function initializeCropping() {
+  // If using mobile cropper, skip manual initialization (will init when showing interface)
+  if (USE_MOBILE_CROPPER()) {
+    return { resetCropSelection: () => {}, updateCropSelection: () => {} };
+  }
   // Initialize crop selection in center
   function resetCropSelection() {
     const imageRect = cropImage.getBoundingClientRect();
@@ -473,6 +481,75 @@ function showCropInterface(imageBlob) {
   originalImageBlob = imageBlob;
   cropImage.src = URL.createObjectURL(imageBlob);
   cropContainer.style.display = 'flex';
+
+  // Mobile alternative using Cropper.js
+  if (USE_MOBILE_CROPPER()) {
+    // Destroy previous
+    if (mobileCropper) {
+      mobileCropper.destroy();
+      mobileCropper = null;
+    }
+    mobileCropper = new Cropper(cropImage, {
+      viewMode: 1,
+      dragMode: 'move',
+      responsive: true,
+      autoCropArea: 0.85,
+      movable: true,
+      zoomable: true,
+      rotatable: false,
+      scalable: false,
+      background: false,
+      modal: true,
+      guides: true,
+      highlight: false,
+      crop(event) {
+        // we could update status or preview if needed
+      }
+    });
+    // Rewire buttons for mobile mode
+    cropConfirm.onclick = async () => {
+      try {
+        statusDiv.textContent = 'Applying crop...';
+        const canvas = mobileCropper.getCroppedCanvas({
+          imageSmoothingEnabled: true,
+          imageSmoothingQuality: 'high'
+        });
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            statusDiv.textContent = 'Crop failed.';
+            return;
+          }
+            capturedImageBlob = blob;
+            preview.src = URL.createObjectURL(blob);
+            preview.style.display = 'block';
+            cropContainer.style.display = 'none';
+            await processImageToPDF(blob);
+        }, 'image/jpeg', 0.95);
+      } catch (e) {
+        console.error(e);
+        statusDiv.textContent = 'Crop error.';
+      }
+    };
+    cropReset.onclick = () => {
+      mobileCropper.reset();
+    };
+    cropSkip.onclick = async () => {
+      cropContainer.style.display = 'none';
+      capturedImageBlob = originalImageBlob;
+      preview.src = URL.createObjectURL(originalImageBlob);
+      preview.style.display = 'block';
+      await processImageToPDF(originalImageBlob);
+    };
+    cropCancel.onclick = () => {
+      cropContainer.style.display = 'none';
+      if (mobileCropper) { mobileCropper.destroy(); mobileCropper = null; }
+      capturedImageBlob = originalImageBlob;
+      if (originalImageBlob) {
+        preview.src = URL.createObjectURL(originalImageBlob);
+        preview.style.display = 'block';
+      }
+    };
+  }
 }
 
 // Open camera with facingMode

@@ -341,10 +341,10 @@ function initializeCropping() {
   cropOverlay.addEventListener('mousemove', handleMove);
   cropOverlay.addEventListener('mouseup', handleEnd);
   
-  // Touch events
-  cropOverlay.addEventListener('touchstart', handleStart);
-  cropOverlay.addEventListener('touchmove', handleMove);
-  cropOverlay.addEventListener('touchend', handleEnd);
+  // Touch events with passive: false for mobile support
+  cropOverlay.addEventListener('touchstart', handleStart, { passive: false });
+  cropOverlay.addEventListener('touchmove', handleMove, { passive: false });
+  cropOverlay.addEventListener('touchend', handleEnd, { passive: false });
   
   // Button handlers
   cropReset.onclick = resetCropSelection;

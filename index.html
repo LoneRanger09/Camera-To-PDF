@@ -6,11 +6,8 @@
   <meta name="theme-color" content="#000000">
   <title>Camera to PDF Web App</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Cropper.js (used for simpler mobile cropping experience) -->
-  <link rel="stylesheet" href="https://unpkg.com/cropperjs/dist/cropper.css">
   <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
   <script src="https://unpkg.com/browser-image-compression/dist/browser-image-compression.js"></script>
-  <script src="https://unpkg.com/cropperjs/dist/cropper.js"></script>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
@@ -46,6 +43,24 @@
         <button id="cropSkip" class="crop-btn skip">Skip Crop</button>
         <button id="cropCancel" class="crop-btn cancel">Cancel</button>
         <button id="cropReset" class="crop-btn reset">Reset Selection</button>
+      </div>
+    </div>
+
+    <!-- Mobile Pinch-Zoom Cropping Container -->
+    <div id="mobileCropContainer" class="mobile-crop-container" style="display:none;">
+      <div class="mobile-crop-header">
+        <h3>Adjust & Crop</h3>
+        <p>Pinch to zoom, drag to move. Area inside the frame will be kept.</p>
+      </div>
+      <div class="mobile-crop-canvas-wrapper">
+        <canvas id="mobileCropCanvas"></canvas>
+        <div class="mobile-crop-frame"></div>
+      </div>
+      <div class="mobile-crop-buttons">
+        <button id="mobileCropConfirm" class="crop-btn confirm">Crop & Continue</button>
+        <button id="mobileCropSkip" class="crop-btn skip">Skip</button>
+        <button id="mobileCropCancel" class="crop-btn cancel">Cancel</button>
+        <button id="mobileCropReset" class="crop-btn reset">Reset</button>
       </div>
     </div>
     

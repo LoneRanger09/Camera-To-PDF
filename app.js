@@ -18,6 +18,167 @@ const cropConfirm = document.getElementById('cropConfirm');
 const cropCancel = document.getElementById('cropCancel');
 const cropReset = document.getElementById('cropReset');
 const cropSkip = document.getElementById('cropSkip');
+// Mobile crop elements
+const mobileCropContainer = document.getElementById('mobileCropContainer');
+const mobileCropCanvas = document.getElementById('mobileCropCanvas');
+const mobileCropConfirm = document.getElementById('mobileCropConfirm');
+const mobileCropSkip = document.getElementById('mobileCropSkip');
+const mobileCropCancel = document.getElementById('mobileCropCancel');
+const mobileCropReset = document.getElementById('mobileCropReset');
+
+// Mobile crop state
+let isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+let mcCtx = null;
+let mcImage = null;
+let mcScale = 1;
+let mcMinScale = 1;
+let mcMaxScale = 5;
+let mcStartDistance = 0;
+let mcTranslateX = 0;
+let mcTranslateY = 0;
+let mcLastTranslateX = 0;
+let mcLastTranslateY = 0;
+let mcDragging = false;
+let mcDragStartX = 0;
+let mcDragStartY = 0;
+
+function showMobileCrop(imageBlob){
+  mobileCropContainer.style.display = 'flex';
+  if(!mcCtx){ mcCtx = mobileCropCanvas.getContext('2d'); }
+  mcImage = new Image();
+  mcImage.onload = () => {
+    // Fit canvas to viewport
+    mobileCropCanvas.width = window.innerWidth;
+    mobileCropCanvas.height = window.innerHeight * 0.7; // leave space for buttons
+    // Determine initial scale to cover frame
+    const frameW = window.innerWidth * 0.8;
+    const frameH = window.innerHeight * 0.6;
+    const scaleW = frameW / mcImage.width;
+    const scaleH = frameH / mcImage.height;
+    mcScale = Math.max(scaleW, scaleH);
+    mcMinScale = mcScale;
+    mcTranslateX = (mobileCropCanvas.width - mcImage.width * mcScale)/2;
+    mcTranslateY = (mobileCropCanvas.height - mcImage.height * mcScale)/2;
+    drawMobileCrop();
+  };
+  mcImage.src = URL.createObjectURL(imageBlob);
+}
+
+function drawMobileCrop(){
+  if(!mcCtx || !mcImage) return;
+  mcCtx.clearRect(0,0,mobileCropCanvas.width,mobileCropCanvas.height);
+  mcCtx.save();
+  mcCtx.setTransform(mcScale,0,0,mcScale,mcTranslateX,mcTranslateY);
+  mcCtx.drawImage(mcImage,0,0);
+  mcCtx.restore();
+}
+
+function handleMobileCropTouchStart(e){
+  if(e.touches.length === 1){
+    mcDragging = true;
+    mcDragStartX = e.touches[0].clientX;
+    mcDragStartY = e.touches[0].clientY;
+    mcLastTranslateX = mcTranslateX;
+    mcLastTranslateY = mcTranslateY;
+  } else if(e.touches.length === 2){
+    mcDragging = false;
+    mcStartDistance = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+}
+
+function handleMobileCropTouchMove(e){
+  e.preventDefault();
+  if(e.touches.length === 1 && mcDragging){
+    const dx = e.touches[0].clientX - mcDragStartX;
+    const dy = e.touches[0].clientY - mcDragStartY;
+    mcTranslateX = mcLastTranslateX + dx;
+    mcTranslateY = mcLastTranslateY + dy;
+    drawMobileCrop();
+  } else if(e.touches.length === 2){
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    if(mcStartDistance){
+      const factor = dist / mcStartDistance;
+      const newScale = Math.min(mcMaxScale, Math.max(mcMinScale, mcScale * factor));
+      // Zoom towards center of two touches
+      const centerX = (e.touches[0].clientX + e.touches[1].clientX)/2 - mobileCropCanvas.getBoundingClientRect().left;
+      const centerY = (e.touches[0].clientY + e.touches[1].clientY)/2 - mobileCropCanvas.getBoundingClientRect().top;
+      const preZoomX = (centerX - mcTranslateX)/mcScale;
+      const preZoomY = (centerY - mcTranslateY)/mcScale;
+      mcScale = newScale;
+      mcTranslateX = centerX - preZoomX * mcScale;
+      mcTranslateY = centerY - preZoomY * mcScale;
+      drawMobileCrop();
+    }
+  }
+}
+
+function handleMobileCropTouchEnd(e){
+  if(e.touches.length === 0){
+    mcDragging = false;
+    mcStartDistance = 0;
+  }
+}
+
+function confirmMobileCrop(){
+  // Frame dimensions
+  const frameW = window.innerWidth * 0.8;
+  const frameH = window.innerHeight * 0.6;
+  const frameX = (mobileCropCanvas.width - frameW)/2;
+  const frameY = (mobileCropCanvas.height - frameH)/2;
+  // Create offscreen canvas to extract area
+  const out = document.createElement('canvas');
+  out.width = frameW;
+  out.height = frameH;
+  const octx = out.getContext('2d');
+  // Inverse transform logic
+  octx.drawImage(
+    mcImage,
+    (frameX - mcTranslateX)/mcScale,
+    (frameY - mcTranslateY)/mcScale,
+    frameW / mcScale,
+    frameH / mcScale,
+    0,0,frameW,frameH
+  );
+  out.toBlob(async blob => {
+    capturedImageBlob = blob;
+    preview.src = URL.createObjectURL(blob);
+    preview.style.display = 'block';
+    mobileCropContainer.style.display = 'none';
+    statusDiv.textContent = 'Crop applied! Processing PDF...';
+    await processImageToPDF(blob);
+  }, 'image/jpeg', 0.95);
+}
+
+function resetMobileCrop(){
+  if(!mcImage) return;
+  const frameW = window.innerWidth * 0.8;
+  const frameH = window.innerHeight * 0.6;
+  const scaleW = frameW / mcImage.width;
+  const scaleH = frameH / mcImage.height;
+  mcScale = Math.max(scaleW, scaleH);
+  mcMinScale = mcScale;
+  mcTranslateX = (mobileCropCanvas.width - mcImage.width * mcScale)/2;
+  mcTranslateY = (mobileCropCanvas.height - mcImage.height * mcScale)/2;
+  drawMobileCrop();
+}
+
+// Mobile crop event bindings
+if(isTouchDevice){
+  mobileCropCanvas.addEventListener('touchstart', handleMobileCropTouchStart, { passive:false });
+  mobileCropCanvas.addEventListener('touchmove', handleMobileCropTouchMove, { passive:false });
+  mobileCropCanvas.addEventListener('touchend', handleMobileCropTouchEnd, { passive:false });
+  mobileCropConfirm && (mobileCropConfirm.onclick = confirmMobileCrop);
+  mobileCropSkip && (mobileCropSkip.onclick = async ()=>{ mobileCropContainer.style.display='none'; preview.src = URL.createObjectURL(originalImageBlob); preview.style.display='block'; await processImageToPDF(originalImageBlob); });
+  mobileCropCancel && (mobileCropCancel.onclick = ()=>{ mobileCropContainer.style.display='none'; preview.style.display='none'; });
+  mobileCropReset && (mobileCropReset.onclick = resetMobileCrop);
+  window.addEventListener('resize', ()=>{ if(mobileCropContainer.style.display==='flex'){ resetMobileCrop(); }});
+}
 
 let capturedImageBlob = null;
 let originalImageBlob = null;
@@ -37,10 +198,6 @@ let cropData = {
   width: 200,
   height: 200
 };
-
-// Cropper.js instance (mobile alternative)
-let mobileCropper = null;
-const USE_MOBILE_CROPPER = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && window.Cropper;
 
 // Initialize the app
 function initializeApp() {
@@ -177,10 +334,6 @@ async function debugCameraAccess() {
 
 // Cropping System Functions
 function initializeCropping() {
-  // If using mobile cropper, skip manual initialization (will init when showing interface)
-  if (USE_MOBILE_CROPPER()) {
-    return { resetCropSelection: () => {}, updateCropSelection: () => {} };
-  }
   // Initialize crop selection in center
   function resetCropSelection() {
     const imageRect = cropImage.getBoundingClientRect();
@@ -479,76 +632,11 @@ async function applyCrop() {
 // Show cropping interface
 function showCropInterface(imageBlob) {
   originalImageBlob = imageBlob;
-  cropImage.src = URL.createObjectURL(imageBlob);
-  cropContainer.style.display = 'flex';
-
-  // Mobile alternative using Cropper.js
-  if (USE_MOBILE_CROPPER()) {
-    // Destroy previous
-    if (mobileCropper) {
-      mobileCropper.destroy();
-      mobileCropper = null;
-    }
-    mobileCropper = new Cropper(cropImage, {
-      viewMode: 1,
-      dragMode: 'move',
-      responsive: true,
-      autoCropArea: 0.85,
-      movable: true,
-      zoomable: true,
-      rotatable: false,
-      scalable: false,
-      background: false,
-      modal: true,
-      guides: true,
-      highlight: false,
-      crop(event) {
-        // we could update status or preview if needed
-      }
-    });
-    // Rewire buttons for mobile mode
-    cropConfirm.onclick = async () => {
-      try {
-        statusDiv.textContent = 'Applying crop...';
-        const canvas = mobileCropper.getCroppedCanvas({
-          imageSmoothingEnabled: true,
-          imageSmoothingQuality: 'high'
-        });
-        canvas.toBlob(async (blob) => {
-          if (!blob) {
-            statusDiv.textContent = 'Crop failed.';
-            return;
-          }
-            capturedImageBlob = blob;
-            preview.src = URL.createObjectURL(blob);
-            preview.style.display = 'block';
-            cropContainer.style.display = 'none';
-            await processImageToPDF(blob);
-        }, 'image/jpeg', 0.95);
-      } catch (e) {
-        console.error(e);
-        statusDiv.textContent = 'Crop error.';
-      }
-    };
-    cropReset.onclick = () => {
-      mobileCropper.reset();
-    };
-    cropSkip.onclick = async () => {
-      cropContainer.style.display = 'none';
-      capturedImageBlob = originalImageBlob;
-      preview.src = URL.createObjectURL(originalImageBlob);
-      preview.style.display = 'block';
-      await processImageToPDF(originalImageBlob);
-    };
-    cropCancel.onclick = () => {
-      cropContainer.style.display = 'none';
-      if (mobileCropper) { mobileCropper.destroy(); mobileCropper = null; }
-      capturedImageBlob = originalImageBlob;
-      if (originalImageBlob) {
-        preview.src = URL.createObjectURL(originalImageBlob);
-        preview.style.display = 'block';
-      }
-    };
+  if(isTouchDevice){
+    showMobileCrop(imageBlob);
+  } else {
+    cropImage.src = URL.createObjectURL(imageBlob);
+    cropContainer.style.display = 'flex';
   }
 }
 

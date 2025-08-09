@@ -40,6 +40,8 @@ let cropData = {
 
 // Initialize the app
 function initializeApp() {
+  // Always set default to back camera on load
+  currentFacingMode = 'environment';
   // Set initial status
   statusDiv.textContent = 'Initializing camera...';
   
@@ -61,7 +63,7 @@ function initializeApp() {
   
   // Check available cameras and start camera
   checkAvailableCameras().then(() => {
-    startCamera(currentFacingMode);
+    startCamera('environment');
   });
 }
 

@@ -645,6 +645,17 @@ async function startCamera(facingMode = 'environment') {
   if (currentStream) {
     currentStream.getTracks().forEach(track => track.stop());
   }
+
+  function inferFacingModeFromStream(stream, requested) {
+    try {
+      const track = stream.getVideoTracks()[0];
+      if (!track) return requested;
+      const label = (track.label || '').toLowerCase();
+      if (label.includes('front') || label.includes('user') || label.includes('face')) return 'user';
+      if (label.includes('back') || label.includes('rear') || label.includes('environment')) return 'environment';
+      return requested; // fallback to requested when unsure
+    } catch { return requested; }
+  }
   
   // Try multiple constraint configurations for better device compatibility
   const constraints = [
@@ -687,19 +698,26 @@ async function startCamera(facingMode = 'environment') {
               const stream = await navigator.mediaDevices.getUserMedia({
                 video: { deviceId: { exact: targetDevice.deviceId } }
               });
-              video.srcObject = stream;
-              currentStream = stream;
-              statusDiv.textContent = `Camera ready (${facingMode})`;
+        video.srcObject = stream;
+        currentStream = stream;
+        const actualMode = inferFacingModeFromStream(stream, facingMode);
+        currentFacingMode = actualMode;
+        statusDiv.textContent = `Camera ready (${actualMode})`;
+        // Update switch button text if multiple cameras
+        switchBtn.textContent = actualMode === 'environment' ? 'Switch to Front' : 'Switch to Back';
               return;
             }
           }
           continue;
         }
         
-        const stream = await navigator.mediaDevices.getUserMedia(constraints[i]);
-        video.srcObject = stream;
-        currentStream = stream;
-        statusDiv.textContent = `Camera ready (${facingMode})`;
+    const stream = await navigator.mediaDevices.getUserMedia(constraints[i]);
+    video.srcObject = stream;
+    currentStream = stream;
+    const actualMode = inferFacingModeFromStream(stream, facingMode);
+    currentFacingMode = actualMode;
+    statusDiv.textContent = `Camera ready (${actualMode})`;
+    switchBtn.textContent = actualMode === 'environment' ? 'Switch to Front' : 'Switch to Back';
         return;
         
       } catch (constraintError) {
@@ -709,10 +727,13 @@ async function startCamera(facingMode = 'environment') {
     }
     
     // Last resort - any camera
-    const stream = await navigator.mediaDevices.getUserMedia(constraints[constraints.length - 1]);
-    video.srcObject = stream;
-    currentStream = stream;
-    statusDiv.textContent = 'Camera ready (default)';
+  const stream = await navigator.mediaDevices.getUserMedia(constraints[constraints.length - 1]);
+  video.srcObject = stream;
+  currentStream = stream;
+  const actualMode = inferFacingModeFromStream(stream, facingMode);
+  currentFacingMode = actualMode;
+  statusDiv.textContent = `Camera ready (${actualMode === facingMode ? 'default' : actualMode})`;
+  switchBtn.textContent = actualMode === 'environment' ? 'Switch to Front' : 'Switch to Back';
     
   } catch (err) {
     console.error('Camera error:', err);
